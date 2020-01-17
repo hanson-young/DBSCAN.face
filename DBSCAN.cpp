@@ -5,8 +5,135 @@
 #include <fstream>
 #include <sstream>
 #include <iosfwd>
-#include <math.h>
+#include <cmath>
 #include <iostream>
+#include <algorithm>
+#include <numeric>
+#include <cassert>
+
+int normalization(std::vector<float>& features){
+    float mean = std::accumulate(std::begin(features), std::end(features), 0.0) / features.size();
+    float accum = 0.0;
+    std::for_each(std::begin(features), std::end(features), [&](const float d){
+        accum += (d - mean) * (d - mean);
+    });
+    float std = sqrt(accum / (features.size() - 1));
+    for (int i = 0; i < features.size(); ++i) {
+        features[i] = (features[i] - mean) / std;
+    }
+}
+
+int mixed_features(const std::vector<std::vector<float>>& gallery_features, const std::vector<std::vector<float>>& query_features, std::vector<float>& mean_features, float alpha){
+    int gallery_size = gallery_features.size();
+    int query_size = query_features.size();
+    std::vector<float> gallery_mean(gallery_features[0].size());
+    std::vector<float> query_mean(query_features[0].size());
+    assert(query_mean.size() == gallery_mean.size());
+    mean_features.resize(query_mean.size());
+    for (int i = 0; i < gallery_size; ++i) {
+        for (int j = 0; j < gallery_mean.size(); ++j) {
+            gallery_mean[j] += gallery_features[i][j];
+        }
+    }
+
+    for (int j = 0; j < gallery_mean.size(); ++j) {
+        gallery_mean[j] /= gallery_size;
+    }
+//    normalization(gallery_mean);
+    for (int i = 0; i < query_size; ++i) {
+        for (int j = 0; j < query_mean.size(); ++j) {
+            query_mean[j] += query_features[i][j];
+        }
+    }
+
+    for (int j = 0; j < query_mean.size(); ++j) {
+        query_mean[j] /= query_size;
+    }
+//    normalization(query_mean);
+    for (int k = 0; k < mean_features.size(); ++k) {
+        mean_features[k] = (1 - alpha) * gallery_mean[k] + alpha * query_mean[k];
+    }
+    normalization(mean_features);
+    return 1;
+}
+
+void test_mixed_features(char* filename)
+{
+    int n = 40;
+    std::ifstream ifs(filename);        //打开文件
+    if (! ifs.is_open())                //若文件已经被打开，报错误信息
+    {
+        std::cout << "Error opening file";    //输出错误信息
+        exit (-1);                        //程序退出
+    }
+    std::vector<std::vector<float>> gallery_features;
+    std::vector<std::vector<float>> query_features;
+    std::vector<std::vector<float>> test_features;
+    unsigned long i=0;            //数据个数统计
+    while (! ifs.eof() )                //从文件中读取POI信息，将POI信息写入POI列表中
+    {
+        std::string line;
+        std::getline(ifs, line);
+//        std::cout<<line<<std::endl;
+        std::istringstream sin(line);
+        std::string field;
+        int j = 0;
+        Embedding emb;                //临时数据点对象
+        int label = 0;
+        std::vector<float> tmp_emb(EMB_SIZE);    //临时数据点维度信息
+        while (std::getline(sin, field, ',')){
+            if(EMB_SIZE == j){
+                label = atoi(field.c_str());
+
+                break;
+            }
+            tmp_emb[j] = atof(field.c_str());
+//            std::cout<<tmp_emb[j]<<std::endl;
+            j++;
+
+        }
+        if (i >=n && i < n+5 ){
+            gallery_features.push_back(tmp_emb);
+        }
+        if (i >=n+5 && i < n+8){
+            query_features.push_back(tmp_emb);
+        }
+        if (i < 100){
+            test_features.push_back(tmp_emb);
+        }
+        i++;
+    }
+    ifs.close();        //关闭文件流
+    std::vector<float> mean_features;
+    mixed_features(gallery_features, query_features, mean_features, 0.1);
+    for (int k = 0; k < test_features.size(); ++k) {
+        float f1dis = 0;
+        float f2dis = 0;
+        float f1f2dis = 0;
+        for (size_t l = 0; l < EMB_SIZE; l++)
+        {
+            f1f2dis += (float)mean_features[l] * (float)test_features[k][l];
+            f1dis += (float)mean_features[l] * (float)mean_features[l];
+            f2dis += (float)test_features[k][l] * (float)test_features[k][l];
+        }
+
+        float distance = f1f2dis / (sqrt(f1dis) * sqrt(f2dis));
+        std::cout<<"num:"<<k<<" score:"<< distance<<std::endl;
+    }
+
+}
+//num:8 score:0.796252
+//num:9 score:0.672971
+//num:10 score:0.824958
+//num:11 score:0.679588
+//num:12 score:0.839884
+//num:13 score:0.844663
+//num:14 score:0.887072
+//num:15 score:0.863094
+//num:16 score:0.838339
+//num:17 score:0.78051
+//num:18 score:0.773189
+//num:19 score:0.830189
 
 Embedding::Embedding(unsigned int emb_id, std::vector<float> emb, bool is_key) {
     this->is_key = is_key;
@@ -129,6 +256,7 @@ DBSCAN::DBSCAN(char* filename, float radius, int min_embs)
         this->SetArrivalEmbs(this->embs[i]);            //计算数据点领域内对象
     }
 }
+
 
 /*
 函数：将已经过聚类算法处理的数据集合写回文件

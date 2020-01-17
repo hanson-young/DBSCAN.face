@@ -7,6 +7,7 @@
 #include<vector>
 
 const int EMB_SIZE = 512;
+void test_mixed_features(char* filename);
 class Embedding
 {
 private:
