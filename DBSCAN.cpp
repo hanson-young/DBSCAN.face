@@ -23,7 +23,7 @@ int normalization(std::vector<float>& features){
     }
 }
 
-int mixed_features(const std::vector<std::vector<float>>& gallery_features, const std::vector<std::vector<float>>& query_features, std::vector<float>& mean_features, float alpha){
+int mixed_features(const std::vector<std::vector<float>>& gallery_features, const std::vector<std::vector<float>>& query_features, const std::vector<float>& last_features, std::vector<float>& mean_features, float alpha, float beta){
     int emb_size = 512;
     int gallery_size = gallery_features.size();
     int query_size = query_features.size();
@@ -58,7 +58,7 @@ int mixed_features(const std::vector<std::vector<float>>& gallery_features, cons
 // new_data = (1-a) old_data + a* new_data
 //
     for (int k = 0; k < mean_features.size(); ++k) {
-        mean_features[k] = (1 - alpha) * gallery_mean[k] + alpha * query_mean[k];
+        mean_features[k] = (1 - alpha - beta) * gallery_mean[k] + beta * last_features[k] + alpha * query_mean[k];
     }
     normalization(mean_features);
     return 1;
@@ -77,6 +77,7 @@ void test_mixed_features(char* filename)
     std::vector<std::vector<float>> query_features;
     std::vector<std::vector<float>> test_features;
     unsigned long i=0;            //数据个数统计
+    std::vector<float> last_emb(EMB_SIZE);
     while (! ifs.eof() )                //从文件中读取POI信息，将POI信息写入POI列表中
     {
         std::string line;
@@ -88,6 +89,7 @@ void test_mixed_features(char* filename)
         Embedding emb;                //临时数据点对象
         int label = 0;
         std::vector<float> tmp_emb(EMB_SIZE);    //临时数据点维度信息
+
         while (std::getline(sin, field, ',')){
             if(EMB_SIZE == j){
                 label = atoi(field.c_str());
@@ -99,12 +101,15 @@ void test_mixed_features(char* filename)
             j++;
 
         }
-        if (i >=n && i < n+5 ){
+        if (i == n ){
+            last_emb = tmp_emb;
+        }
+        if (i >n && i < n+5 ){
             gallery_features.push_back(tmp_emb);
         }
-//        if (i >=n+5 && i < n+8){
-//            query_features.push_back(tmp_emb);
-//        }
+        if (i >=n+5 && i < n+8){
+            query_features.push_back(tmp_emb);
+        }
         if (i < 100){
             test_features.push_back(tmp_emb);
         }
@@ -112,7 +117,7 @@ void test_mixed_features(char* filename)
     }
     ifs.close();        //关闭文件流
     std::vector<float> mean_features;
-    mixed_features(gallery_features, query_features, mean_features, 0.1);
+    mixed_features(gallery_features, query_features,last_emb, mean_features, 0.01, 0.5);
     for (int k = 0; k < test_features.size(); ++k) {
         float f1dis = 0;
         float f2dis = 0;
