@@ -24,22 +24,23 @@ int normalization(std::vector<float>& features){
 }
 
 int mixed_features(const std::vector<std::vector<float>>& gallery_features, const std::vector<std::vector<float>>& query_features, std::vector<float>& mean_features, float alpha){
+    int emb_size = 512;
     int gallery_size = gallery_features.size();
     int query_size = query_features.size();
-    assert(gallery_size != 0);
-    assert(query_size != 0);
-    std::vector<float> gallery_mean(gallery_features[0].size());
-    std::vector<float> query_mean(query_features[0].size());
-    assert(query_mean.size() == gallery_mean.size());
-    mean_features.resize(query_mean.size());
+
+    std::vector<float> gallery_mean(emb_size,0);
+    std::vector<float> query_mean(emb_size,0);
+    mean_features.resize(query_mean.size(),0);
 //计算底库特征值或者旧特征值的簇中心特征值
     for (int i = 0; i < gallery_size; ++i) {
         for (int j = 0; j < gallery_mean.size(); ++j) {
             gallery_mean[j] += gallery_features[i][j];
         }
     }
-    for (int j = 0; j < gallery_mean.size(); ++j) {
-        gallery_mean[j] /= gallery_size;
+    if (gallery_size != 0) {
+        for (int j = 0; j < gallery_mean.size(); ++j) {
+            gallery_mean[j] /= gallery_size;
+        }
     }
 //计算场景比对或者新特征值的簇中心特征值
     for (int i = 0; i < query_size; ++i) {
@@ -47,9 +48,12 @@ int mixed_features(const std::vector<std::vector<float>>& gallery_features, cons
             query_mean[j] += query_features[i][j];
         }
     }
-    for (int j = 0; j < query_mean.size(); ++j) {
-        query_mean[j] /= query_size;
+    if (query_size != 0){
+        for (int j = 0; j < query_mean.size(); ++j) {
+            query_mean[j] /= query_size;
+        }
     }
+
 // 更新参数的一阶低通滤波算法更新簇中心特征
 // new_data = (1-a) old_data + a* new_data
 //
@@ -62,7 +66,7 @@ int mixed_features(const std::vector<std::vector<float>>& gallery_features, cons
 
 void test_mixed_features(char* filename)
 {
-    int n = 40;
+    int n = 0;
     std::ifstream ifs(filename);        //打开文件
     if (! ifs.is_open())                //若文件已经被打开，报错误信息
     {
@@ -98,9 +102,9 @@ void test_mixed_features(char* filename)
         if (i >=n && i < n+5 ){
             gallery_features.push_back(tmp_emb);
         }
-        if (i >=n+5 && i < n+8){
-            query_features.push_back(tmp_emb);
-        }
+//        if (i >=n+5 && i < n+8){
+//            query_features.push_back(tmp_emb);
+//        }
         if (i < 100){
             test_features.push_back(tmp_emb);
         }
