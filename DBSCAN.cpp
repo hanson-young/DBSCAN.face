@@ -26,30 +26,33 @@ int normalization(std::vector<float>& features){
 int mixed_features(const std::vector<std::vector<float>>& gallery_features, const std::vector<std::vector<float>>& query_features, std::vector<float>& mean_features, float alpha){
     int gallery_size = gallery_features.size();
     int query_size = query_features.size();
+    assert(gallery_size != 0);
+    assert(query_size != 0);
     std::vector<float> gallery_mean(gallery_features[0].size());
     std::vector<float> query_mean(query_features[0].size());
     assert(query_mean.size() == gallery_mean.size());
     mean_features.resize(query_mean.size());
+//计算底库特征值或者旧特征值的簇中心特征值
     for (int i = 0; i < gallery_size; ++i) {
         for (int j = 0; j < gallery_mean.size(); ++j) {
             gallery_mean[j] += gallery_features[i][j];
         }
     }
-
     for (int j = 0; j < gallery_mean.size(); ++j) {
         gallery_mean[j] /= gallery_size;
     }
-//    normalization(gallery_mean);
+//计算场景比对或者新特征值的簇中心特征值
     for (int i = 0; i < query_size; ++i) {
         for (int j = 0; j < query_mean.size(); ++j) {
             query_mean[j] += query_features[i][j];
         }
     }
-
     for (int j = 0; j < query_mean.size(); ++j) {
         query_mean[j] /= query_size;
     }
-//    normalization(query_mean);
+// 更新参数的一阶低通滤波算法更新簇中心特征
+// new_data = (1-a) old_data + a* new_data
+//
     for (int k = 0; k < mean_features.size(); ++k) {
         mean_features[k] = (1 - alpha) * gallery_mean[k] + alpha * query_mean[k];
     }
